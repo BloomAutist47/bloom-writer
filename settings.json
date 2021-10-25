@@ -1,0 +1,22 @@
+{
+    "settings": {
+        "Image": 43,
+        "Selected": "asdasdas"
+    },
+    "profiles": {
+        "asda": {
+            "style": "",
+            "size": "",
+            "pageSettings": {
+                "width": "",
+                "height": "",
+                "leftBorder": ""
+            },
+            "letterSettings": {
+                "lineHeight": "",
+                "letterSpacing": "",
+                "wordSpacing": ""
+            }
+        }
+    }
+}
