@@ -12,7 +12,7 @@ import json
 
 import tkinter as tk
 from tkinter import ttk, messagebox
-from ttkwidgets import ScrolledListbox
+from ttkwidgets import ScrolledListbox, AutoHideScrollbar
 from ttkwidgets.frames import ScrolledFrame, ToggledFrame
 from ttkwidgets.autocomplete import AutocompleteCombobox
 
@@ -20,10 +20,12 @@ from PIL import Image, ImageDraw, ImageTk, ImageOps
 from random import randrange
 from pprintpp import pprint
 from threading import Thread
+from psutil import process_iter
 
 from lib.Widgets import rClicker, ButtonBM, LabelEntryBM, MessageBM, TextBM, Tip
 from lib.Style import s
 from lib.Parser import ImageParser
+from lib.Viewer import CanvasImage
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 ctypes.windll.shcore.SetProcessDpiAwareness(1)
@@ -36,11 +38,14 @@ class HandWriter(tk.Frame):
     def __init__(self, master, *args, **kwargs):
         tk.Frame.__init__(self, master, *args, **kwargs)
 
+        self.delete_cache()
+
         # Master configs
         self.master.geometry("800x400")
         self.config(bg = s.bg)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
+        self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         # Variable declaration
         self.handstyle_selected = ""
@@ -57,9 +62,16 @@ class HandWriter(tk.Frame):
         self.profile_list = []
         self.handstyle_list = []
 
+        self.tempImg = ""
+
         # Setups
         with open('./settings.json', 'r', encoding="utf-8") as f:
             self.settings = json.load(f)
+
+        if self.settings["settings"]["Selected"] not in self.settings["profiles"]:
+            self.settings["settings"]["Selected"] = ""
+        self.save_settings()
+
         if self.settings["profiles"] != {}:
             self.parser = ImageParser(self.settings)
         else:
@@ -106,6 +118,18 @@ class HandWriter(tk.Frame):
         # self.profile_windownew()
 
 
+    def on_closing(self):
+        if messagebox.askokcancel("Quit", "Do you want to quit?"):
+            self.master.destroy()
+            self.delete_cache()
+
+    def delete_cache(self):
+        if os.path.exists('./lib/cache/temp.png'):
+            try:
+                os.remove('./lib/cache/temp.png')
+                print("> Deleted Cache")
+            except:
+                pass
 
     def ui(self):
         title = tk.Label(self, bg=s.bg, fg=s.fg,
@@ -149,7 +173,7 @@ class HandWriter(tk.Frame):
         """Creates the Settings window"""
 
         self.sett = tk.Toplevel()
-        self.sett.geometry("700x300")
+        self.sett.geometry("650x450")
         self.sett.title("Settings")
         self.sett.focus_set()
         bg = 'WhiteSmoke'
@@ -167,6 +191,7 @@ class HandWriter(tk.Frame):
         notebook.add(output, text='Output')
 
         pageframe.columnconfigure(2, weight=1)
+        pageframe.rowconfigure(3, weight=1)
         sysframe.columnconfigure(0, weight=1)
         sysframe.columnconfigure(1, weight=1)
         sysframe.columnconfigure(2, weight=1)
@@ -178,7 +203,7 @@ class HandWriter(tk.Frame):
         btn_preframe.grid(row=0, column=0, padx=5, ipady=3,
                          sticky="nw")
         self.btn_preview = ButtonBM(btn_preframe, text="Preview", w=10,
-                               command=lambda: self.start_printing(True))
+                               command=self.profile_preview)
         self.btn_preview.grid(row=0, column=0, padx=10,  sticky="w")
 
 
@@ -225,26 +250,23 @@ class HandWriter(tk.Frame):
         self.pagelistbox.set(self.settings["settings"]["Selected"])
 
 
-        # Letter size
-        lettersizeframe = tk.LabelFrame(pageframe, text="In decimal percent",
-                                        bg=bg, width=50)
-        lettersizeframe.grid(row=1, column=2, padx=10, ipady=3, sticky="nw")
-        eny_lettersize = LabelEntryBM(lettersizeframe, text="      Letter Size",
-                                        bg=bg, tip="Percentage size of the "\
-                                        "Letters. Example -> 0.5 or 0.2 or 1.0")
-        eny_lettersize.grid(row=0, column=0, padx=10, sticky="w")
-
-        
-
-
         # Handwritign Style
         handframe = tk.LabelFrame(pageframe, text="Handwritting Style", bg=bg)           
-        handframe.grid(row=1, column=1, padx=10, ipady=3, 
-                       sticky="nw")
+        handframe.grid(row=1, column=1, padx=10, ipady=4, sticky="nw")
+                       
         self.handstyle = AutocompleteCombobox(handframe, width=22,
                                                 state="readonly", 
                                                 completevalues=self.handstyle_list)
         self.handstyle.grid(row=0, column=0, padx=5, sticky="we")
+
+        # Size
+        lettersizeframe = tk.LabelFrame(pageframe, text="In decimal percent",
+                                        bg=bg, width=50)
+        lettersizeframe.grid(row=1, column=2, ipady=3, sticky="nw")
+        eny_lettersize = LabelEntryBM(lettersizeframe, text="      Letter Size",
+                                        bg=bg, tip="Percentage size of the "\
+                                        "Letters. Example -> 0.5 or 0.2 or 1.0")
+        eny_lettersize.grid(row=0, column=0, padx=10, sticky="w")
 
 
         # Page Settings
@@ -264,7 +286,7 @@ class HandWriter(tk.Frame):
 
         # Letter Settings
         lettersettingframe = tk.LabelFrame(pageframe, text="Letter Settings", bg=bg)
-        lettersettingframe.grid(row=2, column=2, padx=10, ipady=3, sticky="w")
+        lettersettingframe.grid(row=2, column=2, ipady=3, sticky="w")
 
         eny_lineheight = LabelEntryBM(lettersettingframe, text="Line Height",
                                       bg=bg, tip="Space in px between each "\
@@ -280,8 +302,26 @@ class HandWriter(tk.Frame):
                                        "each word.")
         eny_wordspacing.grid(row=2, column=0, padx=10, sticky="e")
 
+        # Letter Config
+        letterconfigframe = tk.LabelFrame(pageframe, text="Letter Config",
+                                          bg=bg, width=50)
+        letterconfigframe.columnconfigure(0, weight=1)
+        letterconfigframe.rowconfigure(0, weight=1)
+        letterconfigframe.grid(row=3, column=1, columnspan=2, padx=10,
+                               ipady=3, sticky="nswe", pady=(0,10))
 
-
+        scroll_bar2 = AutoHideScrollbar(letterconfigframe)
+        scroll_bar2.grid(row=0, column=1, sticky="NS")
+        
+        self.letterconfig = TextBM(letterconfigframe, bd=0,
+                                   bg=letterconfigframe['bg'],
+                                   relief=tk.FLAT, undo=True,
+                                   font=(s.fstyle, 9),
+                                   yscrollcommand=scroll_bar2.set)
+        self.letterconfig.grid(row=0, column=0, sticky="nswe")
+        scroll_bar2.config(command=self.letterconfig.yview)
+        self.letterconfig.bind('<Button-3>', rClicker, add='')
+        
 
         self.pageentries = {
             "lineHeight": eny_lineheight,
@@ -301,6 +341,8 @@ class HandWriter(tk.Frame):
             self.pagelistbox.current(0)
             self.profile_insert(self.profile_list[0])
         
+
+
         """SysFrame"""
         textframe = tk.LabelFrame(sysframe, text="Data list", bd=0, bg=bg, fg=s.bg, font=(s.fstyle, s.fsizesub))
         textdata = tk.Text(textframe, fg="black", width=41, height=2, font=(s.fstyle, s.fsize), undo=True)
@@ -401,23 +443,53 @@ class HandWriter(tk.Frame):
 
         entry.entry.focus_set()
 
+    def profile_preview(self):
+        # Value Check
+        if not self.profile_check():
+            return
+
+        for proc in process_iter():
+            if proc.name() == "display":
+                proc.kill()
+
+        thread = Thread(target=self.converter,
+                        args=[
+                            self.pageentries["width"].getint(),
+                            self.pageentries["height"].getint(),
+                            self.pageentries["leftBorder"].getint(),
+                            self.pageentries["lineHeight"].getint(),
+                            self.pageentries["letterSpacing"].getint(),
+                            self.pageentries["wordSpacing"].getint(),
+                            self.pageentries["size"].getfloat(),
+                            True
+                        ])
+        print("yes")
+        thread.start()
+
+    def profile_viewer(self):
+
+        try:
+            if not tk.Toplevel.winfo_exists(self.topwindow):
+                self.create_topviewer()
+        except:
+            self.create_topviewer()
+
+        self.canvasview = CanvasImage(self.topwindow, path="./lib/cache/temp.png")  # create widget
+        self.canvasview.grid(row=0, column=0)  # show widget
+
+        print()
+
+
     def profile_use(self):
+        """Gets the current values and uses it"""
+
+        # Value Check
+        if not self.profile_check():
+            return
+
         current = self.pagelistbox.get()
         self.settings["settings"]["Selected"] = current 
         self.save_settings()
-
-        # Value Check
-        for entry in self.pageentries:
-            if entry == "size":
-                if not self.pageentries[entry].getfloat():
-                    MessageBM("Invalid Value", f"Please enter only integer in the {entry} entry.")
-                    self.sett.lift()
-                    return
-                else: continue
-            if not self.pageentries[entry].getint():
-                MessageBM("Invalid Value", f"Please enter only integer in the {entry} entry.")
-                self.sett.lift()
-                return
 
         self.page_width = self.pageentries["width"].getint()
         self.page_height = self.pageentries["height"].getint()
@@ -431,23 +503,16 @@ class HandWriter(tk.Frame):
 
         self.handstyle_selected = self.handstyle.get()
 
+        if not self.parser:
+            self.parser = ImageParser(self.settings)
         self.parser.update_data(self.settings)
 
     def profile_save(self):
         """Gathers the page frame setting values"""
         
         # Value Check
-        for entry in self.pageentries:
-            if entry == "size":
-                if not self.pageentries[entry].getfloat():
-                    MessageBM("Invalid Value", f"Please enter only integer in the {entry} entry.")
-                    self.sett.lift()
-                    return
-                else: continue
-            if not self.pageentries[entry].getint():
-                MessageBM("Invalid Value", f"Please enter only integer in the {entry} entry.")
-                self.sett.lift()
-                return
+        if not self.profile_check():
+            return
 
         current = self.pagelistbox.get()
         profile = self.settings["profiles"][current]
@@ -561,6 +626,21 @@ class HandWriter(tk.Frame):
             self.pagelistbox['completevalues'] = self.profile_list
         return self.profile_list
 
+    def profile_check(self):
+        # Value Check
+        for entry in self.pageentries:
+            if entry == "size":
+                if not self.pageentries[entry].getfloat():
+                    MessageBM("Invalid Value", f"Please enter only integer in the {entry} entry.")
+                    self.sett.lift()
+                    return False
+                else: continue
+            if not self.pageentries[entry].getint():
+                MessageBM("Invalid Value", f"Please enter only integer in the {entry} entry.")
+                self.sett.lift()
+                return False
+        return True
+
     def handstyle_get(self):
         """Gets lists of handstyles ini"""
         if not os.path.exists("./Style/"):
@@ -574,6 +654,12 @@ class HandWriter(tk.Frame):
             self.handstyle['completevalues'] = self.handstyle_list
         print(self.handstyle_list)
 
+    def create_topviewer(self):
+        self.topwindow = tk.Toplevel()
+        self.topwindow.title('Advanced Zoom v3.0')
+        self.topwindow.geometry('800x600')  # size of the main window
+        self.topwindow.rowconfigure(0, weight=1)  # make the CanvasImage widget expandable
+        self.topwindow.columnconfigure(0, weight=1)
 
     def save_settings(self):
         """Saves the settings json"""
@@ -585,30 +671,49 @@ class HandWriter(tk.Frame):
         self.settings["settings"]["Image"] = int(self.settings["settings"]["Image"])+1
         self.save_settings()
 
-    def start_printing(self, preview=False):
+    def start_printing(self):
         if not self.parser:
             MessageBM("No Profiles", "Please open the Settings and create a Profile to use the software.")
             return
 
-        if not preview:
-            self.text = self.text_log.get(1.0, tk.END).strip()
-            if self.text == "Type Something here....":
-                MessageBM("Empty Text", "Please input something on the text field to print")
-                return
+        self.text = self.text_log.get(1.0, tk.END).strip()
+        if self.text == "Type Something here....":
+            MessageBM("Empty Text", "Please input something on the text field to print")
+            return
 
-            if self.text.strip() == "":
-                MessageBM("Empty Text", "Please input something on the text field to print")
-                return
+        if self.text.strip() == "":
+            MessageBM("Empty Text", "Please input something on the text field to print")
+            return
 
-            self.text_log['state'] = tk.DISABLED
-            self.text_log['fg'] = 'grey'
-
-        thread = Thread(target=self.converter, args=[preview])
+        thread = Thread(target=self.converter,
+                        args=[
+                            self.page_width,
+                            self.page_height,
+                            self.border_left,
+                            self.line_height,
+                            self.letter_spacing,
+                            self.word_spacing,
+                            self.size,
+                            False
+                        ])
         thread.start()
-        # thread.join()
 
-    def converter(self, preview=False):
+    def converter(self, 
+                  page_width,
+                  page_height,
+                  border_left,
+                  line_height,
+                  letter_spacing,
+                  word_spacing,
+                  letter_size,
+                  preview=False,
+        ):
         """Converts the text into handwriting"""
+
+        self.btn_print['state'] = tk.DISABLED
+        self.btn_setting['state'] = tk.DISABLED
+        self.text_log['state'] = tk.DISABLED
+        self.text_log['fg'] = 'grey'
 
         try:
             # creates output if none existent yet
@@ -619,20 +724,19 @@ class HandWriter(tk.Frame):
             if preview:
                 self.text = self.genertic_texts
 
-            self.btn_print['state'] = tk.DISABLED
-            self.btn_setting['state'] = tk.DISABLED
+
 
             # page temp config
-            page_limit_x = int(self.page_width - (self.page_width*0.25))
-            page_limit_x = 5800
-            page_limit_y = self.page_height - (self.page_height*0.1)
-            print(f"Y Limit: {page_limit_y}\tHeight: {self.page_height}")
-            print(f"X Limit: {page_limit_x}\tHeight: {self.page_width}")
-            x = self.border_left
-            y = self.line_height
+            page_limit_x = int(page_width - (page_width*0.25))
+            page_limit_x = int(page_width - (page_width*0.10))
+            page_limit_y = page_height - (page_height*0.1)
+            print(f"Y Limit: {page_limit_y}\tHeight: {page_height}")
+            print(f"X Limit: {page_limit_x}\tHeight: {page_width}")
+            x = border_left
+            y = line_height
             page_count = 1
 
-            img = Image.new("RGB", (self.page_width, self.page_height), color="White")
+            img = Image.new("RGB", (page_width, page_height), color="White")
 
 
             paragraphs = self.text[:-1].split("\n")
@@ -640,27 +744,27 @@ class HandWriter(tk.Frame):
             pprint(self.parser.master_table)
             
             for paragraph in paragraphs:
-                y += self.line_height
-                x = self.border_left
+                y += line_height
+                x = border_left
 
                 if not paragraph.strip():
-                    y += self.line_height
+                    y += line_height
                     continue
 
                 words = paragraph.split(" ")
                 for word in words:
                     
                     if word.strip() == "":
-                        x += self.word_spacing
+                        x += word_spacing
                         continue
 
                     if y >= page_limit_y:
                         if preview:
                             break
-                        x = self.border_left
-                        y = self.line_height
+                        x = border_left
+                        y = line_height
                         img.save(f'./Output/{self.settings["settings"]["Image"]}_{page_count}.png', quality=50)
-                        img = Image.new("RGB", (self.page_width, self.page_height), color="White")
+                        img = Image.new("RGB", (page_width, page_height), color="White")
                         page_count += 1
 
                     letterlist = []
@@ -671,8 +775,8 @@ class HandWriter(tk.Frame):
                         location = self.parser.master_table[letter]
                         letter_variant = str(randrange(len(glob.glob(location + "*.png")))+1)
                         alp = Image.open(location + "/" + letter_variant + ".png")
-                        if self.size != 1:
-                            alp = alp.resize((int(alp.size[0]*self.size), int(alp.size[1]*self.size)))
+                        if letter_size != 1:
+                            alp = alp.resize((int(alp.size[0]*letter_size), int(alp.size[1]*letter_size)))
 
                         word_size+=alp.size[0]
 
@@ -684,8 +788,8 @@ class HandWriter(tk.Frame):
                     word_size += x
 
                     if word_size > page_limit_x:
-                        x = self.border_left
-                        y += self.line_height
+                        x = border_left
+                        y += line_height
 
                     for item in letterlist:
                         letter = item[0]
@@ -704,11 +808,11 @@ class HandWriter(tk.Frame):
                                 x+= x_left
                         else:
                             img.paste(letterimg, (x, y), mask=letterimg)
-                        x+= (letterimg.size[0] + self.letter_spacing)
+                        x+= (letterimg.size[0] + letter_spacing)
 
 
                     word_size = 0
-                    x += self.word_spacing
+                    x += word_spacing
 
                 else:
                     continue
@@ -716,18 +820,19 @@ class HandWriter(tk.Frame):
 
             self.btn_print['state'] = tk.NORMAL
             self.btn_setting['state'] = tk.NORMAL
-
-            if preview:
-                img.show()
-                return
-
-            img.save(f'./Output/{self.settings["settings"]["Image"]}_{page_count}.png',
-                     quality=50)
-            self.increase_count()
-
             self.text_log['state'] = tk.NORMAL
             self.text_log['fg'] = s.bg
 
+            if preview:
+                # img.show()
+                img.save('./lib/cache/temp.png', quality=50)
+                self.profile_viewer()
+                return 
+
+            img.save(f'./Output/{self.settings["settings"]["Image"]}_{page_count}.png',
+                     quality=50)
+
+            self.increase_count()
             MessageBM("Done", "            Done printing.            ")
             print("Done")
         except:
@@ -736,7 +841,6 @@ class HandWriter(tk.Frame):
             self.btn_print['state'] = tk.NORMAL
             self.btn_setting['state'] = tk.NORMAL
             return
-
 
 if __name__ == "__main__":
     root = tk.Tk()

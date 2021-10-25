@@ -5,6 +5,6 @@ class s:
     fsize = 11
     fsizesub = 9
     sub = "#f04646"
-    
+
     font = (fstyle, fsizesub)
 

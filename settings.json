@@ -1,21 +1,21 @@
 {
     "settings": {
-        "Image": 43,
-        "Selected": "asdasdas"
+        "Image": 4,
+        "Selected": "Adrian"
     },
     "profiles": {
-        "asda": {
-            "style": "",
-            "size": "",
+        "Adrian": {
+            "style": "AdrianHandwritting.ini",
+            "size": 0.3,
             "pageSettings": {
-                "width": "",
-                "height": "",
-                "leftBorder": ""
+                "width": 2000,
+                "height": 1000,
+                "leftBorder": 100
             },
             "letterSettings": {
-                "lineHeight": "",
-                "letterSpacing": "",
-                "wordSpacing": ""
+                "lineHeight": 40,
+                "letterSpacing": 3,
+                "wordSpacing": 20
             }
         }
     }

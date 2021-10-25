@@ -61,7 +61,7 @@ class LabelEntryBM(tk.Frame):
         self.entry.bind('<Button-3>', rClicker, add='')
         self.entry.pack(side="right", expand=True, fill=tk.BOTH)
 
-        self.label = tk.Label(self, text=f"{text}: ", font=s.font)
+        self.label = tk.Label(self, text=f"{text}: ", font=s.font, bg="WhiteSmoke")
         self.label.pack(side="left", expand=True, fill=tk.BOTH)
 
         if tip:
