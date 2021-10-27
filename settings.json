@@ -1,12 +1,12 @@
 {
     "settings": {
-        "Image": 4,
+        "Image": 27,
         "Selected": "Adrian"
     },
     "profiles": {
         "Adrian": {
             "style": "AdrianHandwritting.ini",
-            "size": 0.3,
+            "size": 0.5,
             "pageSettings": {
                 "width": 2000,
                 "height": 1000,
@@ -16,6 +16,57 @@
                 "lineHeight": 40,
                 "letterSpacing": 3,
                 "wordSpacing": 20
+            },
+            "config": {
+                "I": {
+                    "l": 20,
+                    "r": 20
+                },
+                "A": {
+                    "r": 10,
+                    "l": 10
+                },
+                "Ω": {
+                    "r": 20
+                },
+                "B": {
+                    "r": 50
+                }
+            }
+        },
+        "asdasd": {
+            "style": "",
+            "size": "",
+            "pageSettings": {
+                "width": "",
+                "height": "",
+                "leftBorder": ""
+            },
+            "letterSettings": {
+                "lineHeight": "",
+                "letterSpacing": "",
+                "wordSpacing": ""
+            },
+            "config": {}
+        },
+        "Test Profile 1": {
+            "style": "AdrianHandwritting.ini",
+            "size": 0.7,
+            "pageSettings": {
+                "width": 3000,
+                "height": 2500,
+                "leftBorder": 100
+            },
+            "letterSettings": {
+                "lineHeight": 80,
+                "letterSpacing": 5,
+                "wordSpacing": 30
+            },
+            "config": {
+                "A": {
+                    "l": 40,
+                    "r": 50
+                }
             }
         }
     }

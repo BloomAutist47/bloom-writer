@@ -5,9 +5,10 @@ import numpy as np
 
 class ImageParser:
 
-    def __init__(self, setting):
+    def __init__(self):
         self.config = configparser.ConfigParser()
-        self.update_data(setting)
+
+        # self.update_data(setting)
         # self.disect_data()
 
     def update_data(self, setting):
@@ -17,15 +18,67 @@ class ImageParser:
         self.settings = setting
         self.selected = setting["settings"]["Selected"]
         if self.selected in setting["profiles"]:
-            try:
-                self.style = setting["profiles"][self.selected]["style"].replace(".ini", "").strip()
-                self.config.read(f'./Style/{self.style}.ini', encoding="utf-8")
-                self.read_master()
-            except:
-                self.style = ""
+            # try:
+            self.style = setting["profiles"][self.selected]["style"].replace(".ini", "").strip()
+            self.config.read(f'./Style/{self.style}.ini', encoding="utf-8")
+            self.read_master()
+            # except:
+            #     self.style = ""
+            return True
         else:
             self.style = ""
-        
+            return None
+
+    def read_master(self):
+
+        self.master_table = {}
+        self.space_settings = {}
+        path_real = f"./Data/{self.style}"
+        for section in self.listdir(path_real):
+            filepath = f"{path_real}/{section}"
+            if len(os.listdir(filepath)) == 0:
+                print(f"Skipping {section}")
+                continue 
+
+            letters = self.listdir(filepath)
+            for letter in letters:
+                path = f"{path_real}/{section}/{letter}/"
+                if not any(fname.endswith('.png') for fname in os.listdir(path)):
+                    print("no file here lol ", path)
+                    continue
+                self.master_table[letter] = path
+
+            if "setting" in self.config[section]:
+                self.space_settings = self.parse_charsetting(section)
+
+                print(f"{section}: Yup")
+
+    def parse_charsetting(self, section):
+        table = {}
+        all_ = self.config[section]["setting"].strip().replace("(", "").replace(")", "").split("|")
+        for sett in all_:
+            if sett.strip() == "":
+                continue
+            x = sett.split(",")
+            letter = x[0].strip()
+            table[letter] = {}
+            for i in x[1:]:
+                k = i.strip()
+                if "l" in k:
+                    table[letter]["left"] = int(k.replace("l", ""))
+                    continue
+                if "r" in k:
+                    table[letter]["right"] = int(k.replace("r", ""))
+                    continue
+                if "v" in k:
+                    table[letter]["vertical"] = int(k.replace("u", ""))
+                    continue
+
+        return table
+
+
+
+
     def disect_data(self):
         first = 0
         for section in self.config:
@@ -116,53 +169,5 @@ class ImageParser:
 
     def listdir(self, mypath):
         return [f for f in os.listdir(mypath) if not os.path.isfile(os.path.join(mypath, f))]
-
-
-    def parse_charsetting(self, section):
-        table = {}
-        all_ = self.config[section]["setting"].strip().replace("(", "").replace(")", "").split("|")
-        for sett in all_:
-            if sett.strip() == "":
-                continue
-            x = sett.split(",")
-            letter = x[0].strip()
-            table[letter] = {}
-            for i in x[1:]:
-                k = i.strip()
-                if "l" in k:
-                    table[letter]["left"] = int(k.replace("l", ""))
-                    continue
-                if "r" in k:
-                    table[letter]["right"] = int(k.replace("r", ""))
-                    continue
-                if "v" in k:
-                    table[letter]["vertical"] = int(k.replace("u", ""))
-                    continue
-
-        return table
-
-    def read_master(self):
-
-        self.master_table = {}
-        self.space_settings = {}
-        path_real = f"./Data/{self.style}"
-        for section in self.listdir(path_real):
-            filepath = f"{path_real}/{section}"
-            if len(os.listdir(filepath)) == 0:
-                print(f"Skipping {section}")
-                continue 
-
-            letters = self.listdir(filepath)
-            for letter in letters:
-                path = f"{path_real}/{section}/{letter}/"
-                if not any(fname.endswith('.png') for fname in os.listdir(path)):
-                    print("no file here lol ", path)
-                    continue
-                self.master_table[letter] = path
-
-            if "setting" in self.config[section]:
-                self.space_settings = self.parse_charsetting(section)
-
-                print(f"{section}: Yup")
 
 
