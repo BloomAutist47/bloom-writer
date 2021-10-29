@@ -245,16 +245,18 @@ class WindowEntryBM(tk.Toplevel):
         self.entry.entry.focus_set()
 
     def _execute(self, e=None):
+        print("ahhhh")
         result = self.start_func(self.entry.get)
         if result:
             self._release()
 
     def _release(self):
+        if self.end_func:
+            self.end_func()
         self.grab_release()
         self.destroy()
 
-        if self.end_func:
-            self.end_func()
+
 
 
 

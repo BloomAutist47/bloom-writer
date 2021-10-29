@@ -167,7 +167,7 @@ class HandWriter(tk.Frame):
         # self.status.pack(side="right")
         btn_insert = ButtonBM(frametop, text="Insert",
                               command=self.insert_generic)
-        # btn_insert.grid(row=0, column=1, padx=5, sticky="W")
+        btn_insert.grid(row=0, column=1, padx=5, sticky="W")
 
 
         # Button top
@@ -530,7 +530,7 @@ class HandWriter(tk.Frame):
 
         self.styleentries
 
-        WindowEntryBM("New Profile", self.profile_new)
+        WindowEntryBM(title="New Profile", stat_func=self.profile_new)
         self.sett.attributes('-topmost',1)
 
 
@@ -683,7 +683,7 @@ class HandWriter(tk.Frame):
             self.btn_preview['state'] = tk.NORMAL
             self.pagelistbox.current(0)
 
-        return None
+        return True
 
     def profile_delete(self):
         """deletes the current profile"""
@@ -814,7 +814,7 @@ class HandWriter(tk.Frame):
                     if "v" in table[x[0]]:
                         MessageBM("Invalid Char Value", f"\tThe char config {j} is a duplicate.\t")
                         return "Cancel"
-                    table[x[0]]["u"] = int(j.replace("u", ""))
+                    table[x[0]]["v"] = int(j.replace("v", ""))
                     continue
                 MessageBM("Invalid Char Value", f"The value \"{j}\" is not valid. Please only use l, r, or v.")
                 return "Cancel"
@@ -851,7 +851,7 @@ class HandWriter(tk.Frame):
             for widget in self.stylebuttons:
                 self.stylebuttons[widget].enable()
 
-        WindowEntryBM("New Style", self.style_new, _style_enable_buttons)
+        WindowEntryBM(title="New Style", stat_func=self.style_new, end_func=_style_enable_buttons)
         
 
 
@@ -902,7 +902,7 @@ class HandWriter(tk.Frame):
 
         self.previous_section = ""
 
-        return None
+        return True
 
     def style_windowsection(self):
 
@@ -913,7 +913,7 @@ class HandWriter(tk.Frame):
             for widget in self.sectionbuttons:
                 self.stylebuttons[widget].enable()
 
-        WindowEntryBM("New Section", self.style_section_new, _style_enable_buttons)
+        WindowEntryBM(title="New Section", stat_func=self.style_section_new, end_func=_style_enable_buttons)
 
 
 
@@ -1012,9 +1012,14 @@ class HandWriter(tk.Frame):
             MessageBM("Invalid Section name", f"The name \"{item}\" already exists. Please pick a unique name.")
             return "Nope."
 
+        for widget in self.styleentries:
+            self.styleentries[widget].clear()
+
         self.style_ini[item] = {}
         self.section_get()
         self.sctn_header.set(item)
+
+        return True
 
     def style_section_delete(self):
 
@@ -1245,7 +1250,7 @@ class HandWriter(tk.Frame):
                     letter = letter_.upper()
                     if letter not in self.parser.master_table:
                         self.unlock_buttons()
-                        MessageBM("Character Error", f"The following character is not registered in current Style: {letter}")
+                        MessageBM("Character Error", f"The  character \" {letter} \"is not registered in current Style.")
                         raise CharacterDoesNotExists(f"Char: {letter} is not registered.")
                         
                         return
@@ -1278,7 +1283,7 @@ class HandWriter(tk.Frame):
                         if "l" in char_config[letter]:
                             x_left = char_config[letter]["l"]
                         if "v" in char_config[letter]:
-                            y_vertical = char_config[letter]["v"]
+                            y_vertical = -1*char_config[letter]["v"]
                         img.paste(letterimg, (x+x_left, y+y_vertical), mask=letterimg)
                         if "r" in char_config[letter]:
                             x += char_config[letter]["r"]

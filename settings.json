@@ -1,10 +1,10 @@
 {
     "settings": {
-        "Image": 8,
-        "Selected": "Adrian"
+        "Image": 17,
+        "Selected": "Adrian2"
     },
     "profiles": {
-        "Adrian": {
+        "Adrian2": {
             "style": "AdrianHandwriting2.ini",
             "size": 0.2,
             "pageSettings": {
@@ -17,7 +17,140 @@
                 "letterSpacing": 5,
                 "wordSpacing": 40
             },
-            "config": {}
+            "config": {
+                "b": {
+                    "v": 12
+                },
+                "d": {
+                    "v": 10
+                },
+                "f": {
+                    "v": 10
+                },
+                "g": {
+                    "v": -5
+                },
+                "h": {
+                    "v": 10
+                },
+                "i": {
+                    "v": 8
+                },
+                "j": {
+                    "v": 5
+                },
+                "k": {
+                    "v": 12
+                },
+                "l": {
+                    "v": 10
+                },
+                "t": {
+                    "v": 10
+                },
+                "m": {
+                    "v": -3
+                },
+                "n": {
+                    "v": -3
+                },
+                "o": {
+                    "v": -3
+                },
+                "p": {
+                    "v": -3
+                },
+                "q": {
+                    "v": -5
+                },
+                "r": {
+                    "v": -3
+                },
+                "s": {
+                    "v": -3
+                },
+                "u": {
+                    "v": -2
+                },
+                "A": {
+                    "v": 5
+                },
+                "B": {
+                    "v": 5
+                },
+                "C": {
+                    "v": 5
+                },
+                "D": {
+                    "v": 5
+                },
+                "E": {
+                    "v": 5
+                },
+                "F": {
+                    "v": 5
+                },
+                "G": {
+                    "v": 5
+                },
+                "H": {
+                    "v": 5
+                },
+                "I": {
+                    "v": 5
+                },
+                "J": {
+                    "v": 5
+                },
+                "K": {
+                    "v": 5
+                },
+                "L": {
+                    "v": 5
+                },
+                "M": {
+                    "v": 9
+                },
+                "N": {
+                    "v": 5
+                },
+                "O": {
+                    "v": 5
+                },
+                "P": {
+                    "v": 5
+                },
+                "Q": {
+                    "v": 5
+                },
+                "R": {
+                    "v": 5
+                },
+                "S": {
+                    "v": 8
+                },
+                "T": {
+                    "v": 5
+                },
+                "U": {
+                    "v": 5
+                },
+                "V": {
+                    "v": 8
+                },
+                "W": {
+                    "v": 5
+                },
+                "X": {
+                    "v": 5
+                },
+                "Y": {
+                    "v": 5
+                },
+                "Z": {
+                    "v": 5
+                }
+            }
         },
         "Engineering": {
             "style": "",
@@ -31,6 +164,21 @@
                 "lineHeight": "",
                 "letterSpacing": "",
                 "wordSpacing": ""
+            },
+            "config": {}
+        },
+        "Adrian1": {
+            "style": "AdrianHandwriting.ini",
+            "size": 0.7,
+            "pageSettings": {
+                "width": 3000,
+                "height": 3000,
+                "leftBorder": 100
+            },
+            "letterSettings": {
+                "lineHeight": 90,
+                "letterSpacing": 3,
+                "wordSpacing": 70
             },
             "config": {}
         }
