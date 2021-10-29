@@ -9,7 +9,7 @@ class ImageParser:
         self.config = configparser.ConfigParser()
 
         # self.update_data(setting)
-        # self.disect_data()
+        
 
     def update_data(self, setting):
         """updates the style lettering
@@ -53,54 +53,31 @@ class ImageParser:
 
                 print(f"{section}: Yup")
 
-    def parse_charsetting(self, section):
-        table = {}
-        all_ = self.config[section]["setting"].strip().replace("(", "").replace(")", "").split("|")
-        for sett in all_:
-            if sett.strip() == "":
-                continue
-            x = sett.split(",")
-            letter = x[0].strip()
-            table[letter] = {}
-            for i in x[1:]:
-                k = i.strip()
-                if "l" in k:
-                    table[letter]["left"] = int(k.replace("l", ""))
-                    continue
-                if "r" in k:
-                    table[letter]["right"] = int(k.replace("r", ""))
-                    continue
-                if "v" in k:
-                    table[letter]["vertical"] = int(k.replace("u", ""))
-                    continue
 
-        return table
+    def disect_data(self, style, section, config, end_func):
+        # first = 0
+        # for section in config:
+        #     if first == 0:
+        #         # Ignore <DEFAULT> Section of ini that for some goddamn reason appears
+        #         first +=1 
+        #         continue
 
+        data_list = self.data_to_text(config["data"])
+        rows = int(config["row"])
+        columns = int(config["column"])
+        image = config["path"]
 
+        if not os.path.isfile(image):
+            print(f"Can't do {section}. Image path \"{image}\" does not exists")
+            return
 
+        img = cv2.imread(image)
 
-    def disect_data(self):
-        first = 0
-        for section in self.config:
-            if first == 0:
-                # Ignore <DEFAULT> Section of ini that for some goddamn reason appears
-                first +=1 
-                continue
+        self.image_split(style, rows, columns, img, section, data_list)
 
-            data_list = self.data_to_text(self.config[section]["data"])
-            rows = int(self.config[section]["rows"])
-            columns = int(self.config[section]["collumns"])
-            image = self.config[section]["image"]
+        end_func()
 
-            if not os.path.isfile(image):
-                print(f"Skipping {section}. Image path {image} does not exists")
-                continue
-            img = cv2.imread(image)
-
-
-            self.image_split(rows, columns, img, section, data_list)
-
-    def data_to_text(self, data):
+    def data_to_text(self,  data):
         """Ensures text is ultra clean
             :data: string
         """
@@ -110,14 +87,14 @@ class ImageParser:
             if y: value.append(y)
         return value
 
-    def image_split(self, rows, column, img, section, data_list):
+    def image_split(self, style, rows, column, img, section, data_list):
         crop_points = []
         height_size = img.shape[0]/rows
         width_size = img.shape[1]/column
 
         for i in range(1, column+1):
             print(f"\n\nColumn {i}")
-            path = f"./Data/{section}/{data_list[i-1]}/"
+            path = f"./Data/{style}/{section}/{data_list[i-1]}/"
 
             if not os.path.exists(path):
                 os.makedirs(path)

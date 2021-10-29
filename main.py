@@ -11,6 +11,8 @@ import json
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+from tkinter.messagebox import askyesno
+from tkinter.filedialog import askopenfilename
 from ttkwidgets import ScrolledListbox, AutoHideScrollbar
 from ttkwidgets.frames import ScrolledFrame, ToggledFrame
 from ttkwidgets.autocomplete import AutocompleteCombobox
@@ -21,7 +23,7 @@ from pprintpp import pprint
 from threading import Thread
 from psutil import process_iter
 
-from lib.Widgets import rClicker, ButtonBM, LabelEntryBM, MessageBM, TextBM, Tip
+from lib.Widgets import rClicker, ButtonBM, LabelEntryBM, MessageBM, TextBM, Tip, WindowEntryBM, ComboboxBM
 from lib.Style import s
 from lib.Parser import ImageParser
 from lib.Viewer import CanvasImage
@@ -39,10 +41,13 @@ class HandWriter(tk.Frame):
     def __init__(self, master, *args, **kwargs):
         tk.Frame.__init__(self, master, *args, **kwargs)
 
+        self.version = "v.1.0.0"
         self.delete_cache()
+        self.folder_integrity_check()
 
         # Master configs
         self.master.geometry("800x400")
+        self.master.title("Bloom Writer v.1.0.0")
         self.config(bg = s.bg)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
@@ -61,13 +66,23 @@ class HandWriter(tk.Frame):
         self.size = 1
 
         self.tempImg = ""
+        self.previous_section = ""
 
-        self.charconfig = {}
+        self.charconfigs = {}
 
         self.profile_list = []
         self.handstyle_list = []
+        self.sectionlist = []
 
+        settings_default = {"settings": {"Image": 0, "Selected": ""}, "profiles": {}}
         # Setups
+        # self.style_ini = configparser.ConfigParser()
+        self.style_ini = configparser.ConfigParser(comment_prefixes=';', allow_no_value=True)
+
+        if not os.path.exists("settings.json"):
+            with open("settings.json", "w", encoding="utf-8") as f:
+                json.dump(settings_default, f, ensure_ascii=False, indent=4)
+
         with open('./settings.json', 'r', encoding="utf-8") as f:
             self.settings = json.load(f)
 
@@ -84,7 +99,7 @@ class HandWriter(tk.Frame):
         self.profile_use(True)
 
         # Loads the generic texts
-        with open('./lib/texts/generic_text2.txt') as f:
+        with open('./lib/texts/generic_text.txt') as f:
             self.genertic_texts = f.read().replace(",", "").replace(".", "")
 
         # Loads needed lists
@@ -120,8 +135,8 @@ class HandWriter(tk.Frame):
         # Function Calls
 
         self.ui()
-        # self.iconify()
-        # self.profile_windownew()
+        # self.master.iconify()
+        # self.settings_window()
 
 
     def on_closing(self):
@@ -136,11 +151,17 @@ class HandWriter(tk.Frame):
             except:
                 pass
 
+    def folder_integrity_check(self):
+        folders = ["Data", "Input", "Output", "Style", "lib"]
+        for folder in folders:
+            if not os.path.exists(folder):
+                os.makedirs(folder)
+
     def ui(self):
         frametop = tk.Frame(self, bg=s.bg)
         frametop.grid(row=0, column=0, sticky="W", padx=10)
         tk.Label(frametop, bg=s.bg, fg=s.fg,
-                  text="BloomWriter v.2.0", font=(s.fstyle, s.fsize)).grid(row=0, column=0, sticky="W")
+                  text="Bloom Writer", font=(s.fstyle, s.fsize)).grid(row=0, column=0, sticky="W")
         # self.status = tk.Label(frametop, text="[none]", bg=s.bg, fg="whitesmoke",
         #                        font=("Consolas", 10))
         # self.status.pack(side="right")
@@ -190,11 +211,12 @@ class HandWriter(tk.Frame):
     def settings_window(self):
         """Creates the Settings window"""
 
+        bg = 'WhiteSmoke'
+
         self.sett = tk.Toplevel()
         self.sett.geometry("650x450")
         self.sett.title("Settings")
         self.sett.focus_set()
-        bg = 'WhiteSmoke'
         self.sett['bg'] = bg
 
         notebook = ttk.Notebook(self.sett, style='lefttab.TNotebook')
@@ -205,15 +227,24 @@ class HandWriter(tk.Frame):
         output = tk.Frame(notebook, bg='WhiteSmoke', width=200, height=200)
 
         notebook.add(pageframe, text='Page')
-        notebook.add(sysframe, text='Words')
-        notebook.add(output, text='Output')
+        notebook.add(sysframe, text='Style')
+        notebook.add(output, text='Print')
 
         pageframe.columnconfigure(2, weight=1)
         pageframe.rowconfigure(3, weight=1)
-        sysframe.columnconfigure(0, weight=1)
-        sysframe.columnconfigure(1, weight=1)
-        sysframe.columnconfigure(2, weight=1)
 
+        # sysframe.columnconfigure(0, weight=1)
+        sysframe.columnconfigure(2, weight=1)
+        # sysframe.columnconfigure(2, weight=1)
+        # sysframe.rowconfigure(1, weight=1)
+
+
+        # notebook.select(sysframe)
+
+        self.settings_pageframe(pageframe, bg)
+        self.settings_styleframe(sysframe, bg)
+
+    def settings_pageframe(self, pageframe, bg):
 
         """Pageframe"""
         # Profile Buttons
@@ -225,7 +256,7 @@ class HandWriter(tk.Frame):
         self.btn_preview.grid(row=0, column=0, padx=10,  sticky="w")
 
 
-        # Profile Buttons
+        # Command Buttons
         btn_proframe = tk.LabelFrame(pageframe, text="Command", bg=bg)
         btn_proframe.grid(row=1, column=0, rowspan=2, padx=5, ipady=2,
                          sticky="nw")
@@ -242,6 +273,17 @@ class HandWriter(tk.Frame):
                            command=self.profile_delete)
         self.btn_rem.grid(row=4, column=0, padx=10, pady=5, sticky="w")
 
+        # Folder buttons
+        btn_fileframe = tk.LabelFrame(pageframe, text="File", bg=bg)
+        btn_fileframe.grid(row=3, column=0, padx=5, ipady=3,
+                         sticky="nw")
+        btn_file = ButtonBM(btn_fileframe, text="Settings", w=10,
+                               command=lambda: self.file_settings('settings.json'))
+        btn_file.grid(row=0, column=0, padx=10,  sticky="w")
+        btn_gentext = ButtonBM(btn_fileframe, text="Preview Text", w=10,
+                               f=(s.fstyle, 9),
+                               command=lambda: self.file_settings('lib\\texts\\generic_text.txt'))
+        btn_gentext.grid(row=1, column=0, padx=10, pady=5, sticky="w")
 
         # Profile Buttons - Tips
         Tip(self.btn_preview, text="Prints and opens a test image for the profile.")
@@ -331,11 +373,11 @@ class HandWriter(tk.Frame):
         scroll_bar2 = AutoHideScrollbar(charconfigframe)
         scroll_bar2.grid(row=0, column=1, sticky="NS")
         
-        self.charconfig = tk.Text (charconfigframe, bd=0,
-                                   bg=charconfigframe['bg'],
-                                   relief=tk.FLAT, undo=True,
-                                   font=(s.fstyle, 9),
-                                   yscrollcommand=scroll_bar2.set)
+        self.charconfig = tk.Text(charconfigframe, bd=0,
+                                  bg=charconfigframe['bg'],
+                                  relief=tk.FLAT, undo=True,
+                                  font=(s.fstyle, 9),
+                                  yscrollcommand=scroll_bar2.set)
         self.charconfig.grid(row=0, column=0, sticky="nswe")
         scroll_bar2.config(command=self.charconfig.yview)
         self.charconfig.bind('<Button-3>', rClicker, add='')
@@ -360,106 +402,138 @@ class HandWriter(tk.Frame):
             self.profile_insert(self.profile_list[0])
         
 
+    def settings_styleframe(self, sysframe, bg):
 
         """SysFrame"""
-        textframe = tk.LabelFrame(sysframe, text="Data list", bd=0, bg=bg, fg=s.bg, font=(s.fstyle, s.fsizesub))
-        textdata = tk.Text(textframe, fg="black", width=41, height=2, font=(s.fstyle, s.fsize), undo=True)
-        textdata.pack(expand=True, fill=tk.BOTH)
-        textframe.grid(row=0, column=1, columnspan=2, padx=5, sticky="w")
+        # Splice Buttons
+        btn_splitframe = tk.LabelFrame(sysframe, text="Image", bg=bg)
+        btn_splitframe.grid(row=0, column=0, padx=5, ipady=3,
+                         sticky="nw")
+        self.btn_splice = ButtonBM(btn_splitframe, text="Splice", w=10,
+                              command=self.splice_image)
+        self.btn_splice.grid(row=0, column=0, padx=10,  sticky="w")
+
+
+        # Command Buttons
+        btn_cmdframe = tk.LabelFrame(sysframe, text="Command", bg=bg)
+        btn_cmdframe.grid(row=1, column=0, rowspan=2, padx=5, ipady=2,
+                         sticky="nw")
+
+        btn_save2 = ButtonBM(btn_cmdframe, text="Save", w=10, command=self.style_save)
+        btn_save2.grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        btn_new2 = ButtonBM(btn_cmdframe, text="New", w=10, command=self.style_windownew)
+        btn_new2.grid(row=3, column=0, padx=10, sticky="w")
+        btn_rem2 = ButtonBM(btn_cmdframe, text="Delete", w=10,
+                            command=self.style_delete)
+        btn_rem2.grid(row=4, column=0, padx=10, pady=5, sticky="w")
+
+        # Folder buttons
+        btn_foldername = tk.LabelFrame(sysframe, text="Folder", bg=bg)
+        btn_foldername.grid(row=3, column=0, rowspan=3, padx=5, ipady=3,
+                         sticky="nw")
+        btn_data = ButtonBM(btn_foldername, text="Data", w=10,
+                               command=lambda: os.startfile("Data\\"))
+        btn_data.grid(row=0, column=0, padx=10,  sticky="w")
+        btn_style = ButtonBM(btn_foldername, text="Style", w=10,
+                              tip="Opens the .inis folder",
+                              command=lambda: os.startfile("Style\\"))
+        btn_style.grid(row=1, column=0, padx=10,  pady=5,  sticky="w")
+
+
+
+        # Hand style
+        handframe = tk.LabelFrame(sysframe, text="Handwritting Style", bg=bg)           
+        handframe.grid(row=0, column=1, columnspan=2, padx=10, ipady=4, sticky="nw")
+        self.handstyle2 = ComboboxBM(handframe, width=22,
+                                                state="readonly", 
+                                                completevalues=self.handstyle_list)
+        self.handstyle2.grid(row=0, column=0, padx=5, sticky="we")
+        self.handstyle2.bind("<<ComboboxSelected>>", self.style_insert)
+
+        # Section Frame
+        sctn_frame = tk.LabelFrame(sysframe, text="Section", bg=bg)           
+        sctn_frame.grid(row=1, column=1, columnspan=2, padx=10, ipady=4, sticky="nw")
+                       
+        self.sctn_header = ComboboxBM(sctn_frame, width=22,
+                                                state="sectionframe", 
+                                                completevalues=[])
+        self.sctn_header.grid(row=0, column=0, padx=(5,0), sticky="nw")
+        self.sctn_header.bind("<<ComboboxSelected>>", self.style_section_insert)
+        sctn_btn_new = ButtonBM(sctn_frame, text="New", w=10, f=(s.fstyle, 7),
+                                command=self.style_windowsection)
+        sctn_btn_new.grid(row=0, column=1, padx=(5,0), sticky="nw")
+        sctn_btn_del = ButtonBM(sctn_frame, text="Delete", w=11, f=(s.fstyle, 7),
+                                command=self.style_section_delete)
+        sctn_btn_del.grid(row=0, column=2, padx=(5,5), sticky="nw")
+
+        # Widget Row 1
+        textframe = tk.LabelFrame(sysframe, text="Data list", bg=bg, fg=s.bg, font=s.font)
+        textframe.grid(row=2, column=1, columnspan=2, rowspan=2,  padx=10, sticky="nw")
+        textframe.columnconfigure(0, weight=1)
+        textframe.rowconfigure(0, weight=1)
+
+        textdata = TextBM(textframe, bind=False, fg="black", width=40, height=3, font=(s.fstyle, 9), undo=True)
+        textdata.grid(row=0, column=0, padx=5, pady=5, sticky="nsw")
         textdata.bind('<Button-3>', rClicker, add='')
 
         # Widget Row 2
-        dimensionframe = tk.Frame(sysframe, bg=bg)
-        dimensionframe.grid(row=1, column=1, columnspan=2, padx=5, sticky="w")
+        dimensionframe = tk.LabelFrame(sysframe, text="Dimensions", bg=bg, fg=s.bg, font=s.font)
+        dimensionframe.grid(row=5, column=1, columnspan=1, padx=(10,5), sticky="w")
         dimensionframe.columnconfigure(0, weight=1)
 
-        rowframe = tk.LabelFrame(dimensionframe, text="Row", bg=bg, fg=s.bg, font=(s.fstyle, s.fsizesub))
-        rowentry = tk.Entry(rowframe, fg="black", width=6, font=(s.fstyle, s.fsize))
-        rowentry.pack(expand=True, fill=tk.BOTH)
-        rowframe.grid(row=0, column=1, padx=5)
+        eny_row = LabelEntryBM(dimensionframe, bg=bg, width=6, text="Row")
+        eny_row.grid(row=0, column=1, padx=5,  pady=5, ipady=3)
+        eny_clm = LabelEntryBM(dimensionframe, bg=bg, width=6, text="Column")
+        eny_clm.grid(row=0, column=2, padx=5,  pady=5, ipady=3)
 
-        columnframe = tk.LabelFrame(dimensionframe, text="Column", bg=bg, fg=s.bg, font=(s.fstyle, s.fsizesub))
-        columnentry = tk.Entry(columnframe, fg="black", width=6, font=(s.fstyle, s.fsize))
-        columnentry.pack(expand=True, fill=tk.BOTH)
-        columnframe.grid(row=0, column=2)
-
-
-        processframe = tk.LabelFrame(dimensionframe, text="Start splicing image", bg=bg, fg=s.bg, font=(s.fstyle, s.fsizesub))
-        processbutton = ButtonBM(processframe, text="Process", w=10)
-        processbutton.pack(expand=True, fill=tk.BOTH)
-        processframe.grid(row=0, column=0, padx=0)
-
-
+        # Auxilliary buttons
+        btn_aux = tk.LabelFrame(sysframe, text="Buttons", bg=bg, fg=s.bg, font=s.font)
+        btn_aux.grid(row=5, column=2, columnspan=1, padx=12, pady=5, sticky="nw")
+        btn_browse = ButtonBM(btn_aux, text="Browse", w=10, f=(s.fstyle, 9),
+                              height=1,
+                              command=lambda: self.style_askfile(t="Select input image path"))
+        btn_browse.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
+        
 
         # Widget Row 3
-        editframe = tk.LabelFrame(sysframe, text="Chars", bg=bg, fg=s.bg, font=(s.fstyle, s.fsizesub))
-        editframe.grid(row=2, column=1, columnspan=2, padx=5, sticky="nsw")
-
-        letterbox = ScrolledListbox(editframe, height=6, width=4)
-        for i in range(0,26):
-            letterbox.listbox.insert(i, string.ascii_uppercase[i])
-        letterbox.grid(row=0, column=0, sticky="ns")
-        
+        imgfile = tk.LabelFrame(sysframe, text="Image File", bg=bg, fg=s.bg, font=s.font)
+        imgfile.grid(row=4, column=1, columnspan=2, padx=10, sticky="w")
+        imgfile.columnconfigure(0, weight=1)
+        self.eny_file = LabelEntryBM(imgfile, bg=bg, width=35, text="Path")
+        self.eny_file.grid(row=0, column=0, padx=5,  pady=5, ipady=3)
 
 
-        imageframe = tk.LabelFrame(sysframe, text="Input Images", bd=1, bg=bg, fg=s.bg, font=(s.fstyle, s.fsizesub))
-        imageframe.grid(row=0, column=0, padx=5, rowspan=12, ipady=20)
-        imagecontainer = ScrolledFrame(imageframe, compound=tk.LEFT, canvaswidth=5, canvasheight=270, height=10)
-        imagecontainer.grid(row=0, column=0, pady=10)
-        
+        self.styleentries = {
+            "row": eny_row,
+            "column": eny_clm,
+            "path": self.eny_file,
+            "datalist": textdata,
+            "section": self.sctn_header
+        }
 
-        self.img1 = Image.open("./Input/alphabet-upper.png")
-        self.img1 = ImageOps.contain(self.img1, (200,200))
-        self.img1 = ImageTk.PhotoImage(self.img1)
+        self.stylebuttons = {
+            "save": btn_save2,
+            "new": btn_new2 ,
+            "delete": btn_rem2
+        }
 
-        x1 = tk.LabelFrame(imagecontainer.interior, text="img1", bd=0, bg=bg, fg=s.bg, font=(s.fstyle, s.fsizesub))
-        x2 = tk.LabelFrame(imagecontainer.interior, text="img2", bd=0, bg=bg, fg=s.bg, font=(s.fstyle, s.fsizesub))
-        x3 = tk.LabelFrame(imagecontainer.interior, text="img3", bd=0, bg=bg, fg=s.bg, font=(s.fstyle, s.fsizesub))
-        x4 = tk.LabelFrame(imagecontainer.interior, text="img4", bd=0, bg=bg, fg=s.bg, font=(s.fstyle, s.fsizesub))
+        self.sectionbuttons = {
+            "new": sctn_btn_new,
+            "delete": sctn_btn_del
+        }
 
-        x1.grid(row=0, column=0, pady=10)
-        x2.grid(row=1, column=0, pady=10)
-        x3.grid(row=2, column=0, pady=10)
-        x4.grid(row=3, column=0, pady=10)
-
-        img_pack1 = tk.Label(x1, image=self.img1).pack()
-        img_pack2 = tk.Label(x2, image=self.img1).pack()
-        img_pack3 = tk.Label(x3, image=self.img1).pack()
-        img_pack4 = tk.Label(x4, image=self.img1).pack()
+        if self.handstyle_list:
+            self.handstyle2.current(0)
+            self.style_insert(self.handstyle2.get())
 
     def profile_windownew(self):
-        prof = tk.Toplevel()
-        prof.grab_set()
-        prof.lift()
-        prof.attributes('-topmost', 'true')
-        prof.title("New Profile")
-        prof.geometry("550x100")
-        bg = 'WhiteSmoke'
-        prof['bg'] = bg
 
-        prof.columnconfigure(0, weight=1)
+        self.styleentries
 
-        def _release():
-            prof.grab_release()
-            prof.destroy()
-
-        entry = LabelEntryBM(prof, text="Name", bg=bg, width=35)
-        entry.grid(row=0, column=0, pady=30, padx=10, sticky="w")
-        entry.bindkey('<Return>', lambda e: self.profile_new(prof, entry.get))
-        frame = tk.Frame(prof, bg=bg)
-        frame.grid(row=0, column=1, pady=5, sticky="w")
+        WindowEntryBM("New Profile", self.profile_new)
+        self.sett.attributes('-topmost',1)
 
 
-
-        btn_save = ButtonBM(frame, text="Save", bg=bg,
-                            command=lambda: self.profile_new(prof, entry.get))
-        btn_save.grid(row=0, column=0, padx=5, sticky="w")
-
-        btn_cancel = ButtonBM(frame, text="Cancel", bg=bg,
-                              command=_release)
-        btn_cancel.grid(row=0, column=1, padx=5, sticky="e")
-
-        entry.entry.focus_set()
 
     def profile_preview(self):
         # Value Check
@@ -470,6 +544,15 @@ class HandWriter(tk.Frame):
         if char_config == "Cancel":
             return
 
+        def _end_preview():
+            print("WHATTT")
+            self.btn_preview.config(state=tk.NORMAL)
+            self.sett.title("Settings - Preview complete...")
+
+        self.btn_preview.config(state=tk.DISABLED)
+        self.sett.title("Settings - Generating preview...")
+        self.master.title("Bloom Writer v.1.0.0")
+
         thread = Thread(target=self.converter,
                         args=[
                             self.pageentries["width"].getint(),
@@ -479,6 +562,7 @@ class HandWriter(tk.Frame):
                             self.pageentries["letterSpacing"].getint(),
                             self.pageentries["wordSpacing"].getint(),
                             self.pageentries["size"].getfloat(),
+                            _end_preview,
                             char_config,
                             True
                         ])
@@ -524,8 +608,8 @@ class HandWriter(tk.Frame):
         self.size = profile["size"]
         self.handstyle_selected = profile["style"]
 
-        self.charconfig = profile["config"]
-
+        self.charconfigs = profile["config"]
+        print("this: ", self.charconfigs)
         self.parser.update_data(self.settings)
 
     def profile_save(self):
@@ -558,17 +642,17 @@ class HandWriter(tk.Frame):
         MessageBM("Saved Successfully", f"\tDone saving profile {current}. lol\t")
 
 
-    def profile_new(self, toplevel, get):
+    def profile_new(self, get):
         """creates new profile entry"""
         item = get().strip()
         if not item:
             MessageBM("Invalid Profile name", "Please enter atleast a single character")
-            return
+            return "Nope."
 
         if item in self.settings["profiles"]:
             MessageBM("Invalid Profile name", f"\tThe name {item} already "\
                       "exists.\t\nPlease pick a unique name.")
-            return
+            return "Nope."
 
         self.settings["profiles"][item] = {
             "style": "",
@@ -587,6 +671,10 @@ class HandWriter(tk.Frame):
         }
         self.save_settings()
         self.pagelistbox['completevalues'] = self.profile_get()
+        self.pagelistbox.set(item)
+        for item in self.pageentries:
+            self.pageentries[item].clear()
+        self.charconfig.delete("1.0", tk.END)
 
         if self.profile_list:
             self.btn_use['state'] = tk.NORMAL
@@ -595,12 +683,16 @@ class HandWriter(tk.Frame):
             self.btn_preview['state'] = tk.NORMAL
             self.pagelistbox.current(0)
 
-        toplevel.grab_release()
-        toplevel.destroy()
+        return None
 
     def profile_delete(self):
         """deletes the current profile"""
         current = self.pagelistbox.get()
+
+        answer = askyesno(title='Confirmation',
+                          message=f'Are you sure that you want to delete "{current}"?')
+        if not answer:
+            return
         if not current:
             MessageBM("Can't delete", "Nothing to delete, pal.")
             return
@@ -686,32 +778,22 @@ class HandWriter(tk.Frame):
                 return False
         return True
 
-    def handstyle_get(self):
-        """Gets lists of handstyles ini"""
-        if not os.path.exists("./Style/"):
-            os.makedirs("./Style/")
-
-        _handstyles = glob.glob("./Style/*.ini")
-        for style in _handstyles:
-            self.handstyle_list.append(style.split("\\")[-1])
-
-        if hasattr(self, 'handstyle'):
-            self.handstyle['completevalues'] = self.handstyle_list
-        print(self.handstyle_list)
-
     def parse_charsetting(self):
-        charconfig = self.charconfig.get("1.0", tk.END).strip().split("\n")
-        table = {}
-
+        charconfig = self.charconfig.get("1.0", "end").strip()
+        print(f"CHAR: {charconfig}")
         if not charconfig:
             return {}
 
+        table = {}
+        charconfig = charconfig.split("\n")
+        
         for char_ in charconfig:
             x = char_.strip()
             if not x:
                 continue
 
             x = x.split(":", 1)
+            print(f"x: {x}")
             table[x[0]] = {}
             for i in x[1].split(","):
                 j = i.strip()
@@ -747,10 +829,247 @@ class HandWriter(tk.Frame):
 
     def create_topviewer(self):
         self.topwindow = tk.Toplevel()
-        self.topwindow.title('Advanced Zoom v3.0')
+        self.topwindow.title('Print Preview - Advanced Zoom v3.0')
         self.topwindow.geometry('1000x600')  # size of the main window
         self.topwindow.rowconfigure(0, weight=1)  # make the CanvasImage widget expandable
         self.topwindow.columnconfigure(0, weight=1)
+
+    def style_askfile(self, t):
+        """asks for image file path"""
+        filename = askopenfilename(parent=self, title=t, initialdir="./Input/").strip()
+        if not filename:
+            return
+        self.eny_file.insert(os.path.relpath(filename))
+
+    def style_windownew(self):
+
+        for widget in self.stylebuttons:
+            self.stylebuttons[widget].disable()
+
+        def _style_enable_buttons():
+            self.sett.attributes('-topmost',1)
+            for widget in self.stylebuttons:
+                self.stylebuttons[widget].enable()
+
+        WindowEntryBM("New Style", self.style_new, _style_enable_buttons)
+        
+
+
+
+
+    def style_save(self):
+        current = self.handstyle2.get()
+        try:
+            self.style_section_save(self.sctn_header.get())
+        except: pass
+
+        if not self.style_ini.has_section("METADATA"):
+            self.style_ini["METADATA"] = {"version": self.version}
+        with open(f'Style/{current}', 'w') as configfile:    # save
+            self.style_ini.write(configfile)
+
+        MessageBM("Saved ini", f"\tSuccessfully saved {current}.\t")
+        return
+
+    def style_new(self, get):
+        """creates new profile entry"""
+        item = get().strip()
+        if not item:
+            MessageBM("Invalid Profile name", "Please enter atleast a single character")
+            return "Nope."
+        inis = [x.lower() for x in glob.glob("./Style/*.ini")]
+        item_test = f'./style\\{item}.ini'.lower()
+
+        if item_test in inis:
+            MessageBM("Invalid Profile name", f"The name {item} already "\
+                      "exists. Please pick a unique name.\t")
+            return "Nope."
+
+        self.style_ini = configparser.ConfigParser()
+        self.style_ini["METADATA"] = {"version": self.version}
+
+        with open(f'Style\\{item}.ini', 'w') as configfile:
+            self.style_ini.write(configfile)
+
+        self.handstyle_get()
+
+        self.handstyle2.set(f'{item}.ini')
+        for item in self.styleentries:
+            if item == "section": continue
+            self.styleentries[item].clear()
+        self.styleentries["section"]["completevalues"] = []
+        self.styleentries["section"].set("")
+
+        self.previous_section = ""
+
+        return None
+
+    def style_windowsection(self):
+
+        for widget in self.sectionbuttons:
+            self.stylebuttons[widget].disable()
+
+        def _style_enable_buttons():
+            for widget in self.sectionbuttons:
+                self.stylebuttons[widget].enable()
+
+        WindowEntryBM("New Section", self.style_section_new, _style_enable_buttons)
+
+
+
+    def style_insert(self, e):
+        """inserts style ini main data on the widgets"""
+        current = self.widget_check(e)
+        if not current:
+            return
+
+        print(f"Cur: {current}")
+        self.style_ini = configparser.ConfigParser()
+        self.style_ini.read(f'./Style/{current}', encoding="utf-8")
+        print("what")
+
+
+        for widget in self.styleentries:
+            if widget == "section": continue
+            self.styleentries[widget].clear()
+            print(widget)
+
+        self.section_get()
+
+        self.styleentries["section"].set("")
+        if len(self.style_ini.sections()) >= 2:
+            self.styleentries["section"].current(0)
+
+        self.style_section_insert(self.styleentries["section"].get(), True)
+        
+
+
+    def style_delete(self):
+        current = self.handstyle2.get()
+        answer = askyesno(title='Confirmation',
+                          message=f'Are you sure that you want to delete "{current}"?')
+        if answer:
+            try:
+                os.remove(f"Style/{current}")
+            except:
+                pass
+
+            self.handstyle_get()
+            self.handstyle2.current(0)
+            self.style_insert(self.handstyle2.get())
+        return
+
+
+    def style_section_insert(self, e, switch=False):
+        """insert the section data of the style inis"""
+
+        current = self.widget_check(e)
+        if not current or current not in self.style_ini.sections():
+            return 
+        print("yes??")
+        if not switch:
+            self.style_section_save()
+
+        try: self.styleentries["row"].insert(self.style_ini[current]["row"])
+        except: self.styleentries["row"].insert("")
+            
+        try: self.styleentries["column"].insert(self.style_ini[current]["column"])
+        except: self.styleentries["column"].insert("")
+
+        try: self.styleentries["path"].insert(self.style_ini[current]["path"])
+        except: self.styleentries["path"].insert("")
+
+        self.styleentries["datalist"].delete("1.0", tk.END)
+        try:
+            self.styleentries["datalist"].insert("1.0", self.style_ini[current]["data"])
+        except: 
+            pass
+        
+        
+        self.previous_section = current
+
+
+
+    def style_section_save(self, current=None):
+        if not current:
+            if self.previous_section == "":
+                return
+            current = self.previous_section
+
+        self.style_ini[current]["row"] = self.styleentries["row"].get()
+        self.style_ini[current]["column"] = self.styleentries["column"].get()
+
+        self.style_ini[current]["path"] = self.styleentries["path"].get()
+        self.style_ini[current]["data"] = self.styleentries["datalist"].get("1.0", tk.END).strip()
+
+    def style_section_new(self, get):
+        item = get().strip()
+        if not item:
+            MessageBM("Invalid Section name", "Please enter atleast a single character")
+            return "Nope."
+
+        if item in self.style_ini.sections():
+            MessageBM("Invalid Section name", f"The name \"{item}\" already exists. Please pick a unique name.")
+            return "Nope."
+
+        self.style_ini[item] = {}
+        self.section_get()
+        self.sctn_header.set(item)
+
+    def style_section_delete(self):
+
+        current = self.sctn_header.get()
+        answer = askyesno(title='Confirmation',
+                          message=f'Are you sure that you want to delete section "{current}"?')
+        if answer:
+            try:
+                self.style_ini.remove_section(current)
+            except:
+                pass
+
+            self.section_get()
+            self.sctn_header.current(0)
+            self.style_section_insert(self.sctn_header.get(), True)
+        return
+
+    def section_get(self):
+        if len(self.style_ini.sections()) == 1:
+            self.sctn_header["completevalues"] = [""]
+            return
+        sections_ = []
+        for i in self.style_ini.sections():
+            if i == "METADATA":
+                continue
+            sections_.append(i)
+
+        self.sctn_header["completevalues"] = sections_
+
+    def splice_image(self):
+
+
+        def _end_splice():
+            self.btn_splice.config(state=tk.NORMAL)
+            self.sett.title("Settings - Done splicing...")
+
+        self.btn_splice.config(state=tk.DISABLED)
+        self.sett.title("Settings - Splicing image...")
+
+        style = self.handstyle2.get().replace(".ini", "")
+        section = self.sctn_header.get()
+        path = f'./Data/{style}/{section}'
+        
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        thread = Thread(target=self.parser.disect_data,
+                        args=[
+                             style,
+                             section,
+                             self.style_ini[section],
+                             _end_splice
+                        ])
+        thread.start()
+        
 
     def save_settings(self):
         """Saves the settings json"""
@@ -763,23 +1082,62 @@ class HandWriter(tk.Frame):
         self.save_settings()
 
     def open_setting(self):
+        """Opens setting only if its not opened already"""
         try:
             if not tk.Toplevel.winfo_exists(self.sett):
                 self.settings_window()
         except:
             self.settings_window()
 
+
+    def handstyle_get(self):
+        """Gets lists of handstyles ini"""
+        if not os.path.exists("./Style/"):
+            os.makedirs("./Style/")
+
+        _handstyles = glob.glob("./Style/*.ini")
+        self.handstyle_list = []
+        for style in _handstyles:
+            self.handstyle_list.append(style.split("\\")[-1])
+
+        if hasattr(self, 'handstyle'):
+            self.handstyle['completevalues'] = self.handstyle_list
+        if hasattr(self, 'handstyle2'):
+            self.handstyle2['completevalues'] = self.handstyle_list
+
+
+
+    def widget_check(self, e):
+        """Checks if passed value is string or a widget
+            :e: str -> manual function invocation
+                widgetObj -> Automated invocation
+        """
+        if type(e) == str:
+            return e
+        else:
+            return e.widget.get().strip()
+        # return current
+
+    def file_settings(self, file):
+        self.thread_handler(lambda: os.system(file))
+
     def unlock_buttons(self):
-            self.text_log['state'] = tk.NORMAL
-            self.text_log['fg'] = s.bg
-            self.btn_print['state'] = tk.NORMAL
-            self.btn_setting['state'] = tk.NORMAL
+        """Makes the buttons normal"""
+        self.text_log['state'] = tk.NORMAL
+        self.text_log['fg'] = s.bg
+        self.btn_print['state'] = tk.NORMAL
+        self.btn_setting['state'] = tk.NORMAL
 
     def insert_generic(self):
-        # self.text_log.delete("1.0", tk.END)
+        """Inserts generic text on the main text"""
         self.text_log.insert(tk.INSERT, self.genertic_texts.replace(".", "").replace(",", ""))
 
+    def thread_handler(self, function):
+        self.t1 = Thread(target=function, args=[])
+        self.t1.start()
+
     def start_printing(self):
+        """Prints the text in the textlog"""
         if not self.profile_list:
             MessageBM("No Profiles", "Please open the Settings and create a Profile to use the software.")
             return
@@ -793,6 +1151,7 @@ class HandWriter(tk.Frame):
             MessageBM("Empty Text", "Please input something on the text field to print")
             return
 
+        self.master.title("Bloom Writer v.1.0.0 - Printing in progress...")
         thread = Thread(target=self.converter,
                         args=[
                             self.page_width,
@@ -802,7 +1161,8 @@ class HandWriter(tk.Frame):
                             self.letter_spacing,
                             self.word_spacing,
                             self.size,
-                            self.charconfig,
+                            lambda: self.master.title("Bloom Writer v.1.0.0 - Done printing..."),
+                            self.charconfigs,
                             False
                         ])
         thread.start()
@@ -815,11 +1175,12 @@ class HandWriter(tk.Frame):
                   letter_spacing,
                   word_spacing,
                   letter_size,
+                  end_message,
                   char_config={},
                   preview=False,
         ):
         """Converts the text into handwriting"""
-        pprint(char_config)
+        
         self.btn_print['state'] = tk.DISABLED
         self.btn_setting['state'] = tk.DISABLED
         self.text_log['state'] = tk.DISABLED
@@ -944,13 +1305,15 @@ class HandWriter(tk.Frame):
             # img.show()
             img.save('./lib/cache/temp.png', quality=50)
             self.profile_viewer()
+            end_message()
             return 
 
         img.save(f'./Output/{self.settings["settings"]["Image"]}_{page_count}.png',
                  quality=50)
 
         self.increase_count()
-        MessageBM("Done", "            Done printing.            ")
+
+        end_message()
         print("Done")
         # except:
         #     self.text_log['state'] = tk.NORMAL

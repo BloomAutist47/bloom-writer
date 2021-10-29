@@ -1,6 +1,7 @@
 import tkinter as tk
 from .Style import s
 from ttkwidgets.frames import Tooltip
+from ttkwidgets.autocomplete import AutocompleteCombobox
 
 def rClicker(e):
     ''' right click context menu for all Tk Entry and Text widgets'''
@@ -102,8 +103,10 @@ class LabelEntryBM(tk.Frame):
         self.entry.bind(key, func)
 
 
+
 class ButtonBM(tk.Button):
     def __init__(self, *args, **kwargs):
+        tip_text = ""
         if not kwargs:
             kwargs = dict()
         kwargs['bg'] = s.sub
@@ -116,13 +119,32 @@ class ButtonBM(tk.Button):
             kwargs['width'] = 7
         kwargs['relief'] = tk.FLAT
         kwargs['cursor'] = "hand2"
-        kwargs['font'] = s.font
+        if "f" in kwargs:
+            kwargs['font'] = kwargs['f']
+            kwargs.pop('f', None)
+        else:
+            kwargs['font'] = s.font
         kwargs['activebackground'] = "white"
         kwargs['activeforeground'] = "black"
+
+        if 'tip' in kwargs:
+            tip_text = kwargs['tip']
+            kwargs.pop('tip', None)
+
         super().__init__(*args, **kwargs)
+
+        if tip_text:
+            Tip(self, text=tip_text)
 
         self.bind("<Enter>", lambda e: on_enter(e, "#cc3b3b"))
         self.bind("<Leave>", lambda e: on_leave(e, "#f04646"))
+
+    def disable(self):
+        self.state = tk.DISABLED
+
+    def enable(self):
+        self.state = tk.NORMAL
+
 
 class MessageBM(tk.Toplevel):
     def __init__(self, title, message, *args, **kwargs):
@@ -152,17 +174,23 @@ class MessageBM(tk.Toplevel):
         self.focus_set()
 
 class TextBM(tk.Text):
-    def __init__(self, master, *args, **kwargs):
+    def __init__(self, master, tip="", bind=True, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
 
-        self.placeholder = "Type Something here...."
-        self.placeholder_color = '#454545'
-        self.default_fg_color = self['fg']
+        if bind:
+            self.placeholder = "Type Something here...."
+            self.placeholder_color = '#454545'
+            self.default_fg_color = self['fg']
+            self.bind("<FocusIn>", self.foc_in)
+            self.bind("<FocusOut>", self.foc_out)
+            self.put_placeholder()
 
-        self.bind("<FocusIn>", self.foc_in)
-        self.bind("<FocusOut>", self.foc_out)
+        if tip:
+            Tip(self, text=tip)
 
-        self.put_placeholder()
+    def insertt(self, text):
+        self.delete('1.0', tk.END)
+        self.insert('1.0', text)
 
     def put_placeholder(self):
         self.insert(tk.INSERT, self.placeholder)
@@ -180,3 +208,66 @@ class TextBM(tk.Text):
             self['fg'] = self.placeholder_color
 
 
+    def clear(self):
+        self.delete("1.0", tk.END)
+
+
+class WindowEntryBM(tk.Toplevel):
+
+    def __init__(self, title, stat_func, end_func=None, size="550x100", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        bg = 'WhiteSmoke'
+        self.start_func = stat_func
+        self.end_func = end_func
+
+        self.grab_set()
+        self.lift()
+        self.attributes('-topmost', 'true')
+        self.title(title)
+        self.geometry(size)
+        self.config(bg=bg)
+        
+        self.columnconfigure(0, weight=1)
+
+        self.entry = LabelEntryBM(self, text="Name", bg=bg, width=35)
+        self.entry.grid(row=0, column=0, pady=30, padx=10, sticky="w")
+        self.entry.bindkey('<Return>', self._execute)
+        frame = tk.Frame(self, bg=bg)
+        frame.grid(row=0, column=1, pady=5, sticky="w")
+
+        btn_save = ButtonBM(frame, text="Save", bg=bg,
+                            command=self._execute)
+        btn_save.grid(row=0, column=0, padx=5, sticky="w")
+        btn_cancel = ButtonBM(frame, text="Cancel", bg=bg,
+                              command=self._release)
+        btn_cancel.grid(row=0, column=1, padx=5, sticky="e")
+        self.entry.entry.focus_set()
+
+    def _execute(self, e=None):
+        result = self.start_func(self.entry.get)
+        if result:
+            self._release()
+
+    def _release(self):
+        self.grab_release()
+        self.destroy()
+
+        if self.end_func:
+            self.end_func()
+
+
+
+class ComboboxBM(AutocompleteCombobox):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def clear(self):
+        self.completevalues = []
+        self.set("")
+
+    def disable(self):
+        self.state = tk.READONLY
+
+    def enable(self):
+        self.state = tk.NORMAL
